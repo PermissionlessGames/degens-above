@@ -496,10 +496,4 @@ contract TestDegensAbove is Test {
         game.placeBet{value: betSize}(raceID, chariotID);
         vm.stopPrank();
     }
-    
-    function test_placeBet_rejects_before_betting_phase() public {
-        // Skip this test for now since we can't easily test this scenario
-        // We would need to modify the contract to allow for this test case
-        vm.skip(true);
-    }
 }
