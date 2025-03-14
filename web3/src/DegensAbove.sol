@@ -19,7 +19,7 @@ import {ArbSys} from "./ArbSys.sol";
  */
 contract DegensAbove {
     uint256 public constant BetSize = 1024 ether;
-    uint256 public constant BettingPhaseBlocks = 20; // Changed from seconds to blocks
+    uint256 public constant BettingPhaseBlocks = 40;
     uint256 public constant BaseRaceLength = 32;
 
     uint256 public NumRaces;
