@@ -40,7 +40,7 @@ contract TestDegensAbove is Test {
 
     function test_constants() public view {
         assertEq(game.BetSize(), 1024 ether);
-        assertEq(game.BettingPhaseBlocks(), 20);
+        assertEq(game.BettingPhaseBlocks(), 40);
         assertEq(game.BaseRaceLength(), 32);
     }
 
