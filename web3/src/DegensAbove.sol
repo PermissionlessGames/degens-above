@@ -64,7 +64,9 @@ contract DegensAbove {
     mapping(uint256 => mapping(uint256 => uint256)) public RaceChariotPositionSnapshot;
 
     event NewRace(uint256 indexed raceID, uint256 entropy, uint256 length);
-    event ChariotCreated(uint256 indexed raceID, uint256 indexed chariotID, uint256 chariotSpeed, uint256 chariotAttributes);
+    event ChariotCreated(
+        uint256 indexed raceID, uint256 indexed chariotID, uint256 chariotSpeed, uint256 chariotAttributes
+    );
     event ChariotUpdated(uint256 indexed raceID, uint256 indexed chariotID, uint256 finishesAtBlockNumber);
     event BetPlaced(uint256 indexed raceID, address indexed player, uint256 indexed chariotID, uint256 numBets);
     event PotIncreased(uint256 indexed raceID, address indexed contributor, uint256 amount);
@@ -100,26 +102,26 @@ contract DegensAbove {
             revert RaceNotEnded();
         }
         NumRaces++;
-        
+
         // Set up betting phase
         uint256 currentBlock = _blockNumber();
         BettingStartedAt[NumRaces] = currentBlock;
-        
+
         // Race starts after betting phase ends
         RaceStartedAt[NumRaces] = currentBlock + BettingPhaseBlocks;
-        
+
         RaceEntropy[NumRaces] = _entropy();
         RaceLength[NumRaces] = BaseRaceLength + (RaceEntropy[NumRaces] % 128);
         emit NewRace(NumRaces, RaceEntropy[NumRaces], RaceLength[NumRaces]);
 
         RaceEndsAtBlock[NumRaces] = type(uint256).max;
-        
+
         // Initialize the snapshot block to the race start block
         RaceLastSnapshotBlock[NumRaces] = RaceStartedAt[NumRaces];
-        
+
         uint256 i = 0;
         for (i = 0; i < 16; i++) {
-            uint256 chariotEntropy = (RaceEntropy[NumRaces] >> (7 + 16*i)) & (0xFFFF >> 2);
+            uint256 chariotEntropy = (RaceEntropy[NumRaces] >> (7 + 16 * i)) & (0xFFFF >> 2);
             RaceChariotSpeed[NumRaces][i] = chariotEntropy % 4 + 1;
             RaceChariotAttributes[NumRaces][i] = chariotEntropy >> 2;
             emit ChariotCreated(NumRaces, i, RaceChariotSpeed[NumRaces][i], RaceChariotAttributes[NumRaces][i]);
@@ -138,7 +140,7 @@ contract DegensAbove {
             }
             emit ChariotUpdated(NumRaces, i, RaceChariotFinishesAtBlock[NumRaces][i]);
         }
-        
+
         // Emit initial positions event
         emit ChariotPositionsUpdated(NumRaces, RaceLastSnapshotBlock[NumRaces]);
     }
@@ -151,9 +153,9 @@ contract DegensAbove {
         if (raceID > NumRaces) {
             revert InvalidRaceID();
         }
-        
+
         uint256 currentBlock = _blockNumber();
-        
+
         // Check that betting has started
         if (currentBlock < BettingStartedAt[raceID]) {
             revert BettingPhaseNotStarted();
@@ -173,7 +175,7 @@ contract DegensAbove {
         uint256 remainder = msg.value - betAmount;
 
         uint256 rake = betAmount >> 3;
-        
+
         uint256 currentRacePotAmount = betAmount - rake;
         _increasePot(raceID, currentRacePotAmount);
         if (rake > 0) {
@@ -186,7 +188,7 @@ contract DegensAbove {
         emit BetPlaced(raceID, msg.sender, chariotID, numBets);
 
         if (remainder > 0) {
-            (bool success, ) = msg.sender.call{value: remainder}("");
+            (bool success,) = msg.sender.call{value: remainder}("");
             require(success, "Failed to return remainder");
         }
     }
@@ -203,7 +205,7 @@ contract DegensAbove {
             // Update the race pot and balance
             RacePot[raceID] += amount;
             RaceBalance[raceID] += amount;
-            
+
             // Emit the PotIncreased event
             emit PotIncreased(raceID, msg.sender, amount);
         }
@@ -224,55 +226,54 @@ contract DegensAbove {
         if (raceID > NumRaces || chariotID >= 16) {
             return 0;
         }
-        
+
         uint256 currentBlock = _blockNumber();
-        
+
         // If race hasn't started yet, position is 0
         if (currentBlock < RaceStartedAt[raceID]) {
             return 0;
         }
-        
+
         // If we're past the finish block for this chariot, it has completed the race
         if (currentBlock >= RaceChariotFinishesAtBlock[raceID][chariotID]) {
             return RaceLength[raceID];
         }
-        
+
         // Calculate position based on snapshot and elapsed time
-        uint256 elapsedBlocks = currentBlock > RaceLastSnapshotBlock[raceID] 
-            ? currentBlock - RaceLastSnapshotBlock[raceID] 
-            : 0;
-            
+        uint256 elapsedBlocks =
+            currentBlock > RaceLastSnapshotBlock[raceID] ? currentBlock - RaceLastSnapshotBlock[raceID] : 0;
+
         uint256 distanceSinceSnapshot = elapsedBlocks * RaceChariotSpeed[raceID][chariotID];
         uint256 totalDistance = RaceChariotPositionSnapshot[raceID][chariotID] + distanceSinceSnapshot;
-        
+
         // Cap at race length
         return totalDistance < RaceLength[raceID] ? totalDistance : RaceLength[raceID];
     }
-    
+
     /**
      * @notice Update all chariot positions and take a new snapshot
      * @param raceID The ID of the race to update
      */
     function _updateChariotPositions(uint256 raceID) internal {
         uint256 currentBlock = _blockNumber();
-        
+
         // Only update if race has started but not ended
         if (currentBlock < RaceStartedAt[raceID] || currentBlock >= RaceEndsAtBlock[raceID]) {
             return;
         }
-        
+
         // Update position snapshots for all chariots
         for (uint256 i = 0; i < 16; i++) {
             RaceChariotPositionSnapshot[raceID][i] = getChariotPosition(raceID, i);
         }
-        
+
         // Update the snapshot block
         RaceLastSnapshotBlock[raceID] = currentBlock;
-        
+
         // Emit event for the update
         emit ChariotPositionsUpdated(raceID, currentBlock);
     }
-    
+
     /**
      * @notice Change the speed of a chariot and update all position snapshots
      * @param raceID The ID of the race
@@ -283,49 +284,49 @@ contract DegensAbove {
         if (raceID > NumRaces) {
             revert InvalidRaceID();
         }
-        
+
         if (chariotID >= 16) {
             revert InvalidChariotID();
         }
-        
+
         uint256 currentBlock = _blockNumber();
-        
+
         // Can only change speed if race has started but not ended
         if (currentBlock < RaceStartedAt[raceID]) {
             revert BettingPhaseNotStarted();
         }
-        
+
         if (currentBlock >= RaceEndsAtBlock[raceID]) {
             revert RaceAlreadyEnded();
         }
-        
+
         // Speed must be between 1 and 4
         require(newSpeed >= 1 && newSpeed <= 4, "Invalid speed");
-        
+
         // Store old speed for the event
         uint256 oldSpeed = RaceChariotSpeed[raceID][chariotID];
-        
+
         // Update all chariot positions first
         _updateChariotPositions(raceID);
-        
+
         // Change the speed
         RaceChariotSpeed[raceID][chariotID] = newSpeed;
-        
+
         // Recalculate finish block for this chariot
         uint256 remainingDistance = RaceLength[raceID] - RaceChariotPositionSnapshot[raceID][chariotID];
         uint256 blocksToFinish = remainingDistance / newSpeed;
         if (newSpeed * blocksToFinish < remainingDistance) {
             blocksToFinish++;
         }
-        
+
         // Update finish block
         RaceChariotFinishesAtBlock[raceID][chariotID] = currentBlock + blocksToFinish;
-        
+
         // Update race end block if this chariot now finishes earlier than the current earliest
         if (RaceChariotFinishesAtBlock[raceID][chariotID] < RaceEndsAtBlock[raceID]) {
             RaceEndsAtBlock[raceID] = RaceChariotFinishesAtBlock[raceID][chariotID];
         }
-        
+
         // Emit events
         emit ChariotSpeedChanged(raceID, chariotID, oldSpeed, newSpeed);
         emit ChariotUpdated(raceID, chariotID, RaceChariotFinishesAtBlock[raceID][chariotID]);
@@ -340,12 +341,12 @@ contract DegensAbove {
         if (raceID > NumRaces) {
             revert InvalidRaceID();
         }
-        
+
         uint256 currentBlock = _blockNumber();
         if (currentBlock < RaceEndsAtBlock[raceID]) {
             revert RaceNotEnded();
         }
-        
+
         // Update all positions one final time to get accurate final positions
         _updateChariotPositions(raceID);
 
