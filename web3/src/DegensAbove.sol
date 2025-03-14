@@ -19,7 +19,7 @@ import {ArbSys} from "./ArbSys.sol";
  */
 contract DegensAbove {
     uint256 public constant BetSize = 1024 ether;
-    uint256 public constant BettingPhaseSeconds = 60;
+    uint256 public constant BettingPhaseBlocks = 20; // Changed from seconds to blocks
     uint256 public constant BaseRaceLength = 32;
 
     uint256 public NumRaces;
@@ -36,6 +36,10 @@ contract DegensAbove {
     mapping(uint256 => uint256) public RacePot;
     // Race ID -> current balance for that race (deposits - rake - withdrawals)
     mapping(uint256 => uint256) public RaceBalance;
+    // Race ID -> block number at which betting started
+    mapping(uint256 => uint256) public BettingStartedAt;
+    // Race ID -> block number at which betting ends
+    mapping(uint256 => uint256) public BettingEndsAt;
     // Race ID -> block number at which race started
     mapping(uint256 => uint256) public RaceStartedAt;
     // Race ID -> Length of that race
@@ -67,6 +71,7 @@ contract DegensAbove {
     error RaceEnded();
     error InvalidBetAmount();
     error BettingPhaseClosed();
+    error BettingPhaseNotStarted();
     error InvalidChariotID();
     error InvalidRaceID();
 
@@ -89,7 +94,15 @@ contract DegensAbove {
             revert RaceNotEnded();
         }
         NumRaces++;
-        RaceStartedAt[NumRaces] = _blockNumber();
+        
+        // Set up betting phase
+        uint256 currentBlock = _blockNumber();
+        BettingStartedAt[NumRaces] = currentBlock;
+        BettingEndsAt[NumRaces] = currentBlock + BettingPhaseBlocks;
+        
+        // Race starts after betting phase ends
+        RaceStartedAt[NumRaces] = BettingEndsAt[NumRaces];
+        
         RaceEntropy[NumRaces] = _entropy();
         RaceLength[NumRaces] = BaseRaceLength + (RaceEntropy[NumRaces] % 128);
         emit NewRace(NumRaces, RaceEntropy[NumRaces], RaceLength[NumRaces]);
@@ -107,7 +120,8 @@ contract DegensAbove {
             if (RaceChariotSpeed[NumRaces][i] * blocksToFinish < RaceLength[NumRaces]) {
                 blocksToFinish++;
             }
-            RaceChariotFinishesAtBlock[NumRaces][i] = block.number + blocksToFinish;
+            // Chariots finish relative to race start, not betting start
+            RaceChariotFinishesAtBlock[NumRaces][i] = RaceStartedAt[NumRaces] + blocksToFinish;
             if (RaceEndsAtBlock[NumRaces] > RaceChariotFinishesAtBlock[NumRaces][i]) {
                 RaceEndsAtBlock[NumRaces] = RaceChariotFinishesAtBlock[NumRaces][i];
             }
@@ -123,8 +137,16 @@ contract DegensAbove {
         if (raceID > NumRaces) {
             revert InvalidRaceID();
         }
+        
+        uint256 currentBlock = _blockNumber();
+        
+        // Check that betting has started
+        if (currentBlock < BettingStartedAt[raceID]) {
+            revert BettingPhaseNotStarted();
+        }
 
-        if (_blockNumber() > RaceStartedAt[raceID] + BettingPhaseSeconds) {
+        // Check that betting phase is still open
+        if (currentBlock >= BettingEndsAt[raceID]) {
             revert BettingPhaseClosed();
         }
 

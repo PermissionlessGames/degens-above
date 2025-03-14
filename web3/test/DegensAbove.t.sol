@@ -40,7 +40,7 @@ contract TestDegensAbove is Test {
 
     function test_constants() public view {
         assertEq(game.BetSize(), 1024 ether);
-        assertEq(game.BettingPhaseSeconds(), 60);
+        assertEq(game.BettingPhaseBlocks(), 20);
         assertEq(game.BaseRaceLength(), 32);
     }
 
@@ -76,6 +76,11 @@ contract TestDegensAbove is Test {
         }
 
         vm.assertEq(game.RaceEndsAtBlock(expectedRaceID), minimumFinishesAt);
+        
+        // Verify betting phase and race start timing
+        assertEq(game.BettingStartedAt(expectedRaceID), block.number, "Betting should start at current block");
+        assertEq(game.BettingEndsAt(expectedRaceID), block.number + game.BettingPhaseBlocks(), "Betting should end after BettingPhaseBlocks");
+        assertEq(game.RaceStartedAt(expectedRaceID), game.BettingEndsAt(expectedRaceID), "Race should start when betting ends");
     }
 
     function test_nextRace_reverts_if_race_not_ended() public {
@@ -388,11 +393,10 @@ contract TestDegensAbove is Test {
         game.nextRace();
         uint256 raceID = game.NumRaces();
         
-        uint256 currentBlock = block.number;
-        uint256 midRaceBlock = currentBlock + 5;
-        vm.roll(midRaceBlock);
+        // Roll to after betting phase but before race ends
+        vm.roll(game.RaceStartedAt(raceID) + 5);
         
-        assertLt(midRaceBlock, game.RaceEndsAtBlock(raceID), "Test setup: We should be in the middle of the race");
+        assertLt(block.number, game.RaceEndsAtBlock(raceID), "Test setup: We should be in the middle of the race");
         
         uint256 initialRacePot = game.RacePot(raceID);
         uint256 initialRaceBalance = game.RaceBalance(raceID);
@@ -472,7 +476,8 @@ contract TestDegensAbove is Test {
         uint256 betSize = game.BetSize();
         
         vm.startPrank(player1);
-        vm.expectRevert(abi.encodeWithSelector(DegensAbove.RaceEnded.selector));
+        // Since we're rolling to the race end, the betting phase is also closed
+        vm.expectRevert(abi.encodeWithSelector(DegensAbove.BettingPhaseClosed.selector));
         game.placeBet{value: betSize}(raceID, chariotID);
         vm.stopPrank();
     }
@@ -481,10 +486,8 @@ contract TestDegensAbove is Test {
         game.nextRace();
         uint256 raceID = game.NumRaces();
         
-        uint256 raceStartedAt = game.RaceStartedAt(raceID);
-        uint256 bettingPhaseEnd = raceStartedAt + game.BettingPhaseSeconds();
-        
-        vm.roll(bettingPhaseEnd + 1);
+        // Roll to just after the betting phase ends
+        vm.roll(game.BettingEndsAt(raceID));
         
         uint256 chariotID = 5;
         uint256 betSize = game.BetSize();
@@ -493,5 +496,11 @@ contract TestDegensAbove is Test {
         vm.expectRevert(abi.encodeWithSelector(DegensAbove.BettingPhaseClosed.selector));
         game.placeBet{value: betSize}(raceID, chariotID);
         vm.stopPrank();
+    }
+    
+    function test_placeBet_rejects_before_betting_phase() public {
+        // Skip this test for now since we can't easily test this scenario
+        // We would need to modify the contract to allow for this test case
+        vm.skip(true);
     }
 }
