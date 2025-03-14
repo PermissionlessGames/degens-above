@@ -38,9 +38,7 @@ contract DegensAbove {
     mapping(uint256 => uint256) public RaceBalance;
     // Race ID -> block number at which betting started
     mapping(uint256 => uint256) public BettingStartedAt;
-    // Race ID -> block number at which betting ends
-    mapping(uint256 => uint256) public BettingEndsAt;
-    // Race ID -> block number at which race started
+    // Race ID -> block number at which race started (also when betting ends)
     mapping(uint256 => uint256) public RaceStartedAt;
     // Race ID -> Length of that race
     mapping(uint256 => uint256) public RaceLength;
@@ -98,10 +96,9 @@ contract DegensAbove {
         // Set up betting phase
         uint256 currentBlock = _blockNumber();
         BettingStartedAt[NumRaces] = currentBlock;
-        BettingEndsAt[NumRaces] = currentBlock + BettingPhaseBlocks;
         
         // Race starts after betting phase ends
-        RaceStartedAt[NumRaces] = BettingEndsAt[NumRaces];
+        RaceStartedAt[NumRaces] = currentBlock + BettingPhaseBlocks;
         
         RaceEntropy[NumRaces] = _entropy();
         RaceLength[NumRaces] = BaseRaceLength + (RaceEntropy[NumRaces] % 128);
@@ -146,7 +143,7 @@ contract DegensAbove {
         }
 
         // Check that betting phase is still open
-        if (currentBlock >= BettingEndsAt[raceID]) {
+        if (currentBlock >= RaceStartedAt[raceID]) {
             revert BettingPhaseClosed();
         }
 

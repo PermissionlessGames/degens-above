@@ -79,8 +79,7 @@ contract TestDegensAbove is Test {
         
         // Verify betting phase and race start timing
         assertEq(game.BettingStartedAt(expectedRaceID), block.number, "Betting should start at current block");
-        assertEq(game.BettingEndsAt(expectedRaceID), block.number + game.BettingPhaseBlocks(), "Betting should end after BettingPhaseBlocks");
-        assertEq(game.RaceStartedAt(expectedRaceID), game.BettingEndsAt(expectedRaceID), "Race should start when betting ends");
+        assertEq(game.RaceStartedAt(expectedRaceID), block.number + game.BettingPhaseBlocks(), "Race should start (and betting end) after BettingPhaseBlocks");
     }
 
     function test_nextRace_reverts_if_race_not_ended() public {
@@ -487,7 +486,7 @@ contract TestDegensAbove is Test {
         uint256 raceID = game.NumRaces();
         
         // Roll to just after the betting phase ends
-        vm.roll(game.BettingEndsAt(raceID));
+        vm.roll(game.RaceStartedAt(raceID));
         
         uint256 chariotID = 5;
         uint256 betSize = game.BetSize();
