@@ -371,7 +371,7 @@ contract TestDegensAbove is Test {
         uint256 addAmount = 500 ether;
         
         vm.startPrank(player1);
-        vm.expectRevert(abi.encodeWithSelector(DegensAbove.RaceEnded.selector));
+        vm.expectRevert(abi.encodeWithSelector(DegensAbove.RaceAlreadyEnded.selector));
         game.increasePot{value: addAmount}(firstRaceID);
         vm.stopPrank();
         
@@ -495,5 +495,87 @@ contract TestDegensAbove is Test {
         vm.expectRevert(abi.encodeWithSelector(DegensAbove.BettingPhaseClosed.selector));
         game.placeBet{value: betSize}(raceID, chariotID);
         vm.stopPrank();
+    }
+    
+    function test_position_tracking() public {
+        game.nextRace();
+        uint256 raceID = game.NumRaces();
+        
+        // Check initial positions
+        for (uint256 i = 0; i < 16; i++) {
+            assertEq(
+                game.RaceChariotPositionSnapshot(raceID, i), 
+                0, 
+                "Initial position should be 0"
+            );
+        }
+        
+        // Check that snapshot block is set to race start
+        assertEq(
+            game.RaceLastSnapshotBlock(raceID),
+            game.RaceStartedAt(raceID),
+            "Initial snapshot block should be race start block"
+        );
+        
+        // Skip to race start
+        vm.roll(game.RaceStartedAt(raceID));
+        
+        // Store speeds for later comparison
+        uint256[] memory speeds = new uint256[](16);
+        for (uint256 i = 0; i < 16; i++) {
+            speeds[i] = game.RaceChariotSpeed(raceID, i);
+        }
+        
+        // Advance 10 blocks into the race
+        vm.roll(game.RaceStartedAt(raceID) + 10);
+        
+        // Check positions are calculated correctly
+        for (uint256 i = 0; i < 16; i++) {
+            uint256 expectedPosition = speeds[i] * 10;
+            assertEq(
+                game.getChariotPosition(raceID, i),
+                expectedPosition,
+                "Position calculation during race is incorrect"
+            );
+        }
+        
+        // Find the fastest chariot to determine race end
+        uint256 fastestChariot = 0;
+        uint256 earliestFinish = type(uint256).max;
+        for (uint256 i = 0; i < 16; i++) {
+            if (game.RaceChariotFinishesAtBlock(raceID, i) < earliestFinish) {
+                earliestFinish = game.RaceChariotFinishesAtBlock(raceID, i);
+                fastestChariot = i;
+            }
+        }
+        
+        // Skip to race end
+        vm.roll(earliestFinish);
+        
+        // End the race
+        game.endRace(raceID, false);
+        
+        // Check that winners are determined correctly based on position
+        uint256 maxDistance = 0;
+        for (uint256 i = 0; i < 16; i++) {
+            uint256 position = game.RaceChariotPositionSnapshot(raceID, i);
+            if (position > maxDistance) {
+                maxDistance = position;
+            }
+        }
+        
+        for (uint256 i = 0; i < 16; i++) {
+            if (game.RaceChariotPositionSnapshot(raceID, i) == maxDistance) {
+                assertTrue(
+                    game.RaceWinners(raceID, i),
+                    "Chariot at max distance should be a winner"
+                );
+            } else {
+                assertFalse(
+                    game.RaceWinners(raceID, i),
+                    "Chariot not at max distance should not be a winner"
+                );
+            }
+        }
     }
 }

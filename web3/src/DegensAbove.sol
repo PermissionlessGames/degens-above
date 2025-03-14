@@ -42,8 +42,6 @@ contract DegensAbove {
     mapping(uint256 => uint256) public RaceStartedAt;
     // Race ID -> Length of that race
     mapping(uint256 => uint256) public RaceLength;
-    // Race ID -> Winner of that race
-    mapping(uint256 => uint256) public RaceWinner;
     // Race ID -> Chariot ID (0-15) -> Speed of that chariot (1-4)
     mapping(uint256 => mapping(uint256 => uint256)) public RaceChariotSpeed;
     // Race ID -> Chariot ID (0-15) -> binpacked attributes for that chariot
@@ -58,15 +56,25 @@ contract DegensAbove {
     mapping(uint256 => mapping(uint256 => uint256)) public RaceChariotFinishesAtBlock;
     // Race ID -> block number at which race ends
     mapping(uint256 => uint256) public RaceEndsAtBlock;
+    // Race ID -> Chariot ID -> whether this chariot won the race
+    mapping(uint256 => mapping(uint256 => bool)) public RaceWinners;
+    // Race ID -> last block when all chariot positions were snapshotted
+    mapping(uint256 => uint256) public RaceLastSnapshotBlock;
+    // Race ID -> Chariot ID -> distance traveled at the last snapshot
+    mapping(uint256 => mapping(uint256 => uint256)) public RaceChariotPositionSnapshot;
 
     event NewRace(uint256 indexed raceID, uint256 entropy, uint256 length);
     event ChariotCreated(uint256 indexed raceID, uint256 indexed chariotID, uint256 chariotSpeed, uint256 chariotAttributes);
     event ChariotUpdated(uint256 indexed raceID, uint256 indexed chariotID, uint256 finishesAtBlockNumber);
     event BetPlaced(uint256 indexed raceID, address indexed player, uint256 indexed chariotID, uint256 numBets);
     event PotIncreased(uint256 indexed raceID, address indexed contributor, uint256 amount);
+    event RaceEnded(uint256 indexed raceID);
+    event WinningChariot(uint256 indexed raceID, uint256 indexed chariotID);
+    event ChariotPositionsUpdated(uint256 indexed raceID, uint256 snapshotBlock);
+    event ChariotSpeedChanged(uint256 indexed raceID, uint256 indexed chariotID, uint256 oldSpeed, uint256 newSpeed);
 
     error RaceNotEnded();
-    error RaceEnded();
+    error RaceAlreadyEnded();
     error InvalidBetAmount();
     error BettingPhaseClosed();
     error BettingPhaseNotStarted();
@@ -106,12 +114,18 @@ contract DegensAbove {
 
         RaceEndsAtBlock[NumRaces] = type(uint256).max;
         
+        // Initialize the snapshot block to the race start block
+        RaceLastSnapshotBlock[NumRaces] = RaceStartedAt[NumRaces];
+        
         uint256 i = 0;
         for (i = 0; i < 16; i++) {
             uint256 chariotEntropy = (RaceEntropy[NumRaces] >> (7 + 16*i)) & (0xFFFF >> 2);
             RaceChariotSpeed[NumRaces][i] = chariotEntropy % 4 + 1;
             RaceChariotAttributes[NumRaces][i] = chariotEntropy >> 2;
             emit ChariotCreated(NumRaces, i, RaceChariotSpeed[NumRaces][i], RaceChariotAttributes[NumRaces][i]);
+
+            // Initialize position snapshot to 0 (starting line)
+            RaceChariotPositionSnapshot[NumRaces][i] = 0;
 
             uint256 blocksToFinish = RaceLength[NumRaces] / RaceChariotSpeed[NumRaces][i];
             if (RaceChariotSpeed[NumRaces][i] * blocksToFinish < RaceLength[NumRaces]) {
@@ -124,6 +138,9 @@ contract DegensAbove {
             }
             emit ChariotUpdated(NumRaces, i, RaceChariotFinishesAtBlock[NumRaces][i]);
         }
+        
+        // Emit initial positions event
+        emit ChariotPositionsUpdated(NumRaces, RaceLastSnapshotBlock[NumRaces]);
     }
 
     function placeBet(uint256 raceID, uint256 chariotID) external payable {
@@ -178,7 +195,7 @@ contract DegensAbove {
     function _increasePot(uint256 raceID, uint256 amount) internal {
         // If this is a past race (has ended), always revert
         if (raceID <= NumRaces && _blockNumber() >= RaceEndsAtBlock[raceID]) {
-            revert RaceEnded();
+            revert RaceAlreadyEnded();
         }
 
         // Only update state if amount is greater than 0
@@ -195,5 +212,163 @@ contract DegensAbove {
     // External function to increase pot with msg.value
     function increasePot(uint256 raceID) external payable {
         _increasePot(raceID, msg.value);
+    }
+
+    /**
+     * @notice Calculate the current position of a chariot based on the last snapshot and elapsed time
+     * @param raceID The ID of the race
+     * @param chariotID The ID of the chariot
+     * @return The current position (distance traveled) of the chariot
+     */
+    function getChariotPosition(uint256 raceID, uint256 chariotID) public view returns (uint256) {
+        if (raceID > NumRaces || chariotID >= 16) {
+            return 0;
+        }
+        
+        uint256 currentBlock = _blockNumber();
+        
+        // If race hasn't started yet, position is 0
+        if (currentBlock < RaceStartedAt[raceID]) {
+            return 0;
+        }
+        
+        // If we're past the finish block for this chariot, it has completed the race
+        if (currentBlock >= RaceChariotFinishesAtBlock[raceID][chariotID]) {
+            return RaceLength[raceID];
+        }
+        
+        // Calculate position based on snapshot and elapsed time
+        uint256 elapsedBlocks = currentBlock > RaceLastSnapshotBlock[raceID] 
+            ? currentBlock - RaceLastSnapshotBlock[raceID] 
+            : 0;
+            
+        uint256 distanceSinceSnapshot = elapsedBlocks * RaceChariotSpeed[raceID][chariotID];
+        uint256 totalDistance = RaceChariotPositionSnapshot[raceID][chariotID] + distanceSinceSnapshot;
+        
+        // Cap at race length
+        return totalDistance < RaceLength[raceID] ? totalDistance : RaceLength[raceID];
+    }
+    
+    /**
+     * @notice Update all chariot positions and take a new snapshot
+     * @param raceID The ID of the race to update
+     */
+    function _updateChariotPositions(uint256 raceID) internal {
+        uint256 currentBlock = _blockNumber();
+        
+        // Only update if race has started but not ended
+        if (currentBlock < RaceStartedAt[raceID] || currentBlock >= RaceEndsAtBlock[raceID]) {
+            return;
+        }
+        
+        // Update position snapshots for all chariots
+        for (uint256 i = 0; i < 16; i++) {
+            RaceChariotPositionSnapshot[raceID][i] = getChariotPosition(raceID, i);
+        }
+        
+        // Update the snapshot block
+        RaceLastSnapshotBlock[raceID] = currentBlock;
+        
+        // Emit event for the update
+        emit ChariotPositionsUpdated(raceID, currentBlock);
+    }
+    
+    /**
+     * @notice Change the speed of a chariot and update all position snapshots
+     * @param raceID The ID of the race
+     * @param chariotID The ID of the chariot to modify
+     * @param newSpeed The new speed for the chariot (1-4)
+     */
+    function changeChariotSpeed(uint256 raceID, uint256 chariotID, uint256 newSpeed) external {
+        if (raceID > NumRaces) {
+            revert InvalidRaceID();
+        }
+        
+        if (chariotID >= 16) {
+            revert InvalidChariotID();
+        }
+        
+        uint256 currentBlock = _blockNumber();
+        
+        // Can only change speed if race has started but not ended
+        if (currentBlock < RaceStartedAt[raceID]) {
+            revert BettingPhaseNotStarted();
+        }
+        
+        if (currentBlock >= RaceEndsAtBlock[raceID]) {
+            revert RaceAlreadyEnded();
+        }
+        
+        // Speed must be between 1 and 4
+        require(newSpeed >= 1 && newSpeed <= 4, "Invalid speed");
+        
+        // Store old speed for the event
+        uint256 oldSpeed = RaceChariotSpeed[raceID][chariotID];
+        
+        // Update all chariot positions first
+        _updateChariotPositions(raceID);
+        
+        // Change the speed
+        RaceChariotSpeed[raceID][chariotID] = newSpeed;
+        
+        // Recalculate finish block for this chariot
+        uint256 remainingDistance = RaceLength[raceID] - RaceChariotPositionSnapshot[raceID][chariotID];
+        uint256 blocksToFinish = remainingDistance / newSpeed;
+        if (newSpeed * blocksToFinish < remainingDistance) {
+            blocksToFinish++;
+        }
+        
+        // Update finish block
+        RaceChariotFinishesAtBlock[raceID][chariotID] = currentBlock + blocksToFinish;
+        
+        // Update race end block if this chariot now finishes earlier than the current earliest
+        if (RaceChariotFinishesAtBlock[raceID][chariotID] < RaceEndsAtBlock[raceID]) {
+            RaceEndsAtBlock[raceID] = RaceChariotFinishesAtBlock[raceID][chariotID];
+        }
+        
+        // Emit events
+        emit ChariotSpeedChanged(raceID, chariotID, oldSpeed, newSpeed);
+        emit ChariotUpdated(raceID, chariotID, RaceChariotFinishesAtBlock[raceID][chariotID]);
+    }
+
+    /**
+     * @notice Ends a race, determines winners, and optionally starts the next race
+     * @param raceID The ID of the race to end
+     * @param startNextRace Whether to automatically start the next race
+     */
+    function endRace(uint256 raceID, bool startNextRace) external {
+        if (raceID > NumRaces) {
+            revert InvalidRaceID();
+        }
+        
+        uint256 currentBlock = _blockNumber();
+        if (currentBlock < RaceEndsAtBlock[raceID]) {
+            revert RaceNotEnded();
+        }
+        
+        // Update all positions one final time to get accurate final positions
+        _updateChariotPositions(raceID);
+
+        // Find the maximum distance traveled (some chariots might not complete the full race)
+        uint256 maxDistance = 0;
+        for (uint256 i = 0; i < 16; i++) {
+            if (RaceChariotPositionSnapshot[raceID][i] > maxDistance) {
+                maxDistance = RaceChariotPositionSnapshot[raceID][i];
+            }
+        }
+
+        // Mark winners (chariots that traveled the maximum distance)
+        for (uint256 i = 0; i < 16; i++) {
+            if (RaceChariotPositionSnapshot[raceID][i] == maxDistance) {
+                RaceWinners[raceID][i] = true;
+                emit WinningChariot(raceID, i);
+            }
+        }
+
+        emit RaceEnded(raceID);
+
+        if (startNextRace) {
+            nextRace();
+        }
     }
 }
