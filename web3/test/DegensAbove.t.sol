@@ -122,7 +122,7 @@ contract TestDegensAbove is Test {
         assertEq(game.RacePot(raceID), initialRacePot + expectedPotIncrease, "Race pot should increase by bet amount minus rake");
         assertEq(game.RaceBalance(raceID), initialRaceBalance + expectedPotIncrease, "Race balance should increase by bet amount minus rake");
         assertEq(game.RacePlayerTotalBets(raceID, player1), initialPlayerTotalBets + 1, "Player total bets should increase by 1");
-        assertEq(game.RacePlayerChariotBets(raceID, player1, chariotID), initialPlayerChariotBet + game.BetSize(), "Player chariot bet should increase");
+        assertEq(game.RacePlayerChariotBets(raceID, player1, chariotID), initialPlayerChariotBet + 1, "Player chariot bet should increase by 1");
         assertEq(player1.balance, initialPlayerBalance - game.BetSize(), "Player balance should decrease by bet amount");
     }
     
@@ -164,7 +164,7 @@ contract TestDegensAbove is Test {
             assertEq(game.RacePot(raceID), initialRacePot + expectedPotIncrease, "Race pot should increase by total bet amount minus rake");
             assertEq(game.RaceBalance(raceID), initialRaceBalance + expectedPotIncrease, "Race balance should increase by total bet amount minus rake");
             assertEq(game.RacePlayerTotalBets(raceID, player1), initialPlayerTotalBets + numBets, "Player total bets should increase by number of bets");
-            assertEq(game.RacePlayerChariotBets(raceID, player1, chariotID), initialPlayerChariotBet + (numBets * game.BetSize()), "Player chariot bet should increase by total bet amount");
+            assertEq(game.RacePlayerChariotBets(raceID, player1, chariotID), initialPlayerChariotBet + numBets, "Player chariot bet should increase by number of bets");
             assertEq(player1.balance, initialPlayerBalance - (numBets * game.BetSize()), "Player balance should decrease by total bet amount (remainder returned)");
         }
     }

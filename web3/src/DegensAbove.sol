@@ -68,6 +68,7 @@ contract DegensAbove {
     error InvalidBetAmount();
     error BettingPhaseClosed();
     error InvalidChariotID();
+    error InvalidRaceID();
 
     constructor() {}
 
@@ -120,6 +121,10 @@ contract DegensAbove {
             revert InvalidBetAmount();
         }
 
+        if (raceID > NumRaces) {
+            revert InvalidRaceID();
+        }
+
         // Check that the betting phase is still open
         if (_blockNumber() > RaceStartedAt[raceID] + BettingPhaseSeconds) {
             revert BettingPhaseClosed();
@@ -140,20 +145,18 @@ contract DegensAbove {
         
         // Update the race pot and balance (subtract rake from current race pot)
         uint256 currentRacePotAmount = betAmount - rake;
-        RacePot[raceID] += currentRacePotAmount;
-        RaceBalance[raceID] += betAmount; // Full amount still goes to balance
-
-        // Update the player's bets
-        RacePlayerChariotBets[raceID][msg.sender][chariotID] += betAmount;
-        RacePlayerTotalBets[raceID][msg.sender] += numBets;
-
-        // Emit the BetPlaced event
-        emit BetPlaced(raceID, msg.sender, chariotID, numBets);
-
+        _increasePot(raceID, currentRacePotAmount);
         // Add rake to the next race pot
         if (rake > 0) {
             _increasePot(raceID + 1, rake);
         }
+
+        // Update the player's bets
+        RacePlayerChariotBets[raceID][msg.sender][chariotID] += numBets;
+        RacePlayerTotalBets[raceID][msg.sender] += numBets;
+
+        // Emit the BetPlaced event
+        emit BetPlaced(raceID, msg.sender, chariotID, numBets);
 
         // Return any remainder to the sender
         if (remainder > 0) {
