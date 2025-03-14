@@ -116,7 +116,6 @@ contract DegensAbove {
     }
 
     function placeBet(uint256 raceID, uint256 chariotID) external payable {
-        // Check that the bet amount is at least BetSize
         if (msg.value < BetSize) {
             revert InvalidBetAmount();
         }
@@ -125,40 +124,31 @@ contract DegensAbove {
             revert InvalidRaceID();
         }
 
-        // Check that the betting phase is still open
         if (_blockNumber() > RaceStartedAt[raceID] + BettingPhaseSeconds) {
             revert BettingPhaseClosed();
         }
 
-        // Check that the chariot ID is valid
         if (chariotID >= 16) {
             revert InvalidChariotID();
         }
 
-        // Calculate number of bets and the actual bet amount
         uint256 numBets = msg.value / BetSize;
         uint256 betAmount = numBets * BetSize;
         uint256 remainder = msg.value - betAmount;
 
-        // Calculate rake (1/8 of bet amount)
-        uint256 rake = betAmount >> 3; // Equivalent to betAmount / 8
+        uint256 rake = betAmount >> 3;
         
-        // Update the race pot and balance (subtract rake from current race pot)
         uint256 currentRacePotAmount = betAmount - rake;
         _increasePot(raceID, currentRacePotAmount);
-        // Add rake to the next race pot
         if (rake > 0) {
             _increasePot(raceID + 1, rake);
         }
 
-        // Update the player's bets
         RacePlayerChariotBets[raceID][msg.sender][chariotID] += numBets;
         RacePlayerTotalBets[raceID][msg.sender] += numBets;
 
-        // Emit the BetPlaced event
         emit BetPlaced(raceID, msg.sender, chariotID, numBets);
 
-        // Return any remainder to the sender
         if (remainder > 0) {
             (bool success, ) = msg.sender.call{value: remainder}("");
             require(success, "Failed to return remainder");
