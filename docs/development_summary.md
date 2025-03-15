@@ -93,4 +93,45 @@ While the details are complex, Degens Above is built on blockchain technology th
 - Verifiable randomness in race generation
 - Permanent record of race results
 
+## Development Conversations: Behind the Scenes
+
+To give a glimpse into our actual development process, here are some examples of our discussions and prompts that shaped the game:
+
+### Position Tracking Implementation
+
+**Initial Request:**
+> "We need to implement position tracking for the chariots during races. The current system only determines winners at the end, but we need to know where each chariot is at any given time."
+
+This seemingly straightforward request led to multiple iterations as we worked through the complexities of tracking positions in a blockchain environment.
+
+### Debugging Sessions
+
+**Troubleshooting Prompt:**
+> "The test is failing at line 374 with an error about abi.encodeWithSelector. What the f*** is going on here?"
+
+These moments of frustration often led to our most productive debugging sessions, where we'd trace through the code line by line to identify the root cause of issues.
+
+### Design Discussions
+
+**Conceptual Question:**
+> "Should we store the entire race history on-chain, or just the final results? I'm concerned about gas costs if we track every position change."
+
+These types of discussions helped us make critical design decisions, balancing technical constraints with gameplay goals.
+
+### Feature Refinement
+
+**Feedback Loop:**
+> "This implementation works, but it's not quite what I had in mind. Can we refactor it to use a global snapshot approach instead of individual position updates?"
+
+The back-and-forth refinement process helped us evolve features from initial concepts to polished implementations, even when the path wasn't always smooth.
+
+### Documentation Requests
+
+**Final Touches:**
+> "Can you create a summary of what we've built that I can share with non-technical stakeholders? And don't forget to include our frustrations too!"
+
+These requests helped us step back from the code and reflect on the broader journey, ensuring we documented not just what we built, but how we built it.
+
+Each of these exchanges represents a moment in our development journey where challenges were identified, solutions were proposed, and the game evolved as a result.
+
 We're excited to continue developing this unique gaming experience where players can test their luck, exercise strategy, and occasionally bend the rules of the race with divine intervention! 
