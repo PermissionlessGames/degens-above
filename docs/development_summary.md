@@ -42,6 +42,32 @@ Throughout development, we've maintained a rigorous testing process to ensure th
 - We simulate various race scenarios to ensure fairness
 - Edge cases (like ties or unusual speed patterns) are carefully handled
 
+## Challenges and Frustrations
+
+Like any ambitious project, developing Degens Above came with its share of challenges:
+
+### Technical Hurdles
+
+- **Position Tracking Complexity**: Implementing an accurate position tracking system proved more complex than initially anticipated. We had to rethink our approach several times to ensure positions were calculated correctly across all race scenarios.
+- **Smart Contract Limitations**: Working within the constraints of blockchain technology sometimes meant making difficult trade-offs between feature richness and gas efficiency.
+- **Test Case Edge Scenarios**: Some race conditions were particularly challenging to test, especially those involving multiple chariots finishing at nearly identical times.
+
+### Development Process Challenges
+
+- **Maintaining Code Consistency**: As the codebase grew, ensuring consistent naming conventions and error handling became increasingly important but also more difficult.
+- **Balancing Improvements vs. Stability**: We often faced the dilemma of whether to improve existing functionality or maintain stability of the core game mechanics.
+- **Linter Errors**: Occasionally, linter errors would appear in unexpected places, requiring time to diagnose and fix issues that weren't immediately apparent from the error messages.
+
+### Lessons Learned
+
+These challenges taught us valuable lessons:
+
+1. **Start with Clear Requirements**: Having well-defined requirements from the beginning helps avoid major redesigns later.
+2. **Test Early and Often**: Comprehensive testing from the start saves significant debugging time later.
+3. **Document Design Decisions**: Recording why certain approaches were chosen helps future developers understand the codebase.
+
+Despite these challenges, overcoming each obstacle brought us closer to creating a truly engaging and unique gaming experience.
+
 ## Next Steps
 
 As we continue developing Degens Above, we're focusing on:
