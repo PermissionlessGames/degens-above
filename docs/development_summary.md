@@ -58,6 +58,14 @@ Like any ambitious project, developing Degens Above came with its share of chall
 - **Balancing Improvements vs. Stability**: We often faced the dilemma of whether to improve existing functionality or maintain stability of the core game mechanics.
 - **Linter Errors**: Occasionally, linter errors would appear in unexpected places, requiring time to diagnose and fix issues that weren't immediately apparent from the error messages.
 
+### Communication Challenges
+
+- **Moments of Frustration**: There were definitely times when the development process became frustrating enough to warrant some colorful language! Particularly when dealing with stubborn bugs or when implementations didn't work as expected.
+- **Misaligned Understanding**: Sometimes what seemed like a simple request would turn into a complex implementation challenge, leading to moments of tension in our communication.
+- **Iteration Fatigue**: After multiple rounds of revisions on the same feature, communication occasionally became terse as patience wore thin on both sides.
+
+These moments of frustration, while challenging, ultimately served as pressure points that pushed us to find better solutions. The occasional expletive became a release valve that helped clear the air and refocus our efforts!
+
 ### Lessons Learned
 
 These challenges taught us valuable lessons:
